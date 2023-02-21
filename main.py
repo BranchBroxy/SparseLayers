@@ -51,10 +51,10 @@ def compare_acc(acc_list, save_string="Acc_compare.png"):
     plt.savefig(save_string)
     plt.close()
 
-def compare_models_robustness(mode: str, *models: nn.Module) -> None:
+def compare_models_robustness(mode: str, *models: nn.Module, noise_levels=[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]) -> None:
     from handle_model import handle_model
     acc_list_per_noise_level = []
-    noise_levels = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
+    # noise_levels = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
     for noise_level in noise_levels:
         print(noise_level)
         noisy_train_dataset = add_noise_to_mnist_dataset(train_dataloader.dataset, noise_level=noise_level)
@@ -64,8 +64,10 @@ def compare_models_robustness(mode: str, *models: nn.Module) -> None:
         noisy_test_loader = torch.utils.data.DataLoader(dataset=noisy_test_dataset, batch_size=10, shuffle=False)
 
         model_handlers = []
+        model_names = ["Noise Level"]
         for model in models:
             model_handlers.append(handle_model(model, noisy_train_loader, noisy_test_loader))
+            model_names.append(model.__class__.__name__)
             #models[0].__class__.__name__
         acc_list = []
         for model_runner in model_handlers:
@@ -77,8 +79,38 @@ def compare_models_robustness(mode: str, *models: nn.Module) -> None:
         for acc in acc_list:
             list_to_append.append(acc)
 
-
         acc_list_per_noise_level.append(list_to_append)
+
+    import pandas as pd
+    df = pd.DataFrame(acc_list_per_noise_level)
+
+    df.columns = model_names
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    import matplotlib.ticker as ticker
+
+    figure, axes = plt.subplots()
+    axes.xaxis.set_major_locator(ticker.MultipleLocator(0.1))
+    plt.grid()
+    axes.xaxis.set_major_formatter(ticker.ScalarFormatter())
+    plt.ylabel("Accuracy in %")
+    plt.xlabel("Noise Level")
+    plt.title("Accuracy comparison of NN with MNIST")
+        # df = pd.DataFrame(data=acc_list, columns=["Epoch", "Accuracy"])
+
+    for index, row in df.iterrows():
+        print(row)
+    for i in range(df.shape[1]-1):
+        sns.lineplot(data=df, x=df.iloc[:, 0], y=df.iloc[:, i+1], ax=axes, label=df.columns[i+1], marker="*",
+                     markersize=8)
+
+    plt.legend(loc='lower right')
+        # axes.legend(labels=["Acc1", "Acc2"])
+    plt.savefig("Compare.png")
+    plt.close()
+
+
+
 
     print(acc_list_per_noise_level)
 if __name__ == '__main__':
@@ -107,11 +139,11 @@ if __name__ == '__main__':
     plt.show()
     from models import LinearNN, DenseModel, CNNModel, SparseModel
     dense_model = DenseModel(in_features=28 * 28, hidden_features=128, out_features=10, bias=True)
-    # model = CNNModel(in_features=28 * 28, hidden_features=128, out_features=10, bias=True)
+    cnn_model = CNNModel(in_features=28 * 28, hidden_features=128, out_features=10, bias=True)
     sparse_model = SparseModel(in_features=28 * 28, hidden_features=128, out_features=10, bias=True)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    #compare_models_robustness("plot", dense_model, sparse_model)
+    compare_models_robustness("plot", dense_model, sparse_model, cnn_model)
 
     from handle_model import handle_model
 
